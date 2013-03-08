@@ -1,0 +1,3 @@
+[submodule "web/src/main/webapp/forms"]
+	path = web/src/main/webapp/forms
+	url = https://windauer@github.com/windauer/forms.git
