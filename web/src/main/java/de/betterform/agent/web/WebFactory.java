@@ -167,7 +167,7 @@ public class WebFactory {
         transformerService.addResourceResolver(new ClasspathResourceResolver(realPath));
         transformerService.addResourceResolver(new HttpResourceResolver());
 
-        
+
         boolean xsltCacheEnabled = Config.getInstance().getProperty(WebFactory.XSLT_CACHE_PROPERTY).equalsIgnoreCase("true");
 
         String xsltPath = WebProcessor.RESOURCE_DIR + "xslt/";
@@ -184,10 +184,10 @@ public class WebFactory {
                 // load default stylesheet
                 URI defaultTransformUri = getXsltURI(xsltPath, xsltDefault);
                 transformerService.getTransformer(defaultTransformUri);
-                
+
                 URI errorTransformer = getXsltURI(xsltPath,"error.xsl");
                 transformerService.getTransformer(errorTransformer);
-                
+
                 URI highlightingErrorTransformer = getXsltURI(xsltPath,"highlightError.xsl");
                 transformerService.getTransformer(highlightingErrorTransformer);
 
@@ -210,7 +210,7 @@ public class WebFactory {
         servletContext.setAttribute(TransformerService.TRANSFORMER_SERVICE, transformerService);
     }
 
-     public static XSLTGenerator setupTransformer(URI uri, ServletContext context) throws URISyntaxException {
+    public static XSLTGenerator setupTransformer(URI uri, ServletContext context) throws URISyntaxException {
         TransformerService transformerService = (TransformerService) context.getAttribute(TransformerService.TRANSFORMER_SERVICE);
 
         XSLTGenerator generator = new XSLTGenerator();
@@ -288,22 +288,54 @@ public class WebFactory {
         if (path == null) {
             path = "/";
         }
+        String resourcePath = path;
         URL rootURL = null;
+        String computedRealPath = null;
         try {
             rootURL = Thread.currentThread().getContextClassLoader().getResource("/");
-
-            String computedRealPath = null;
             if (rootURL != null) {
-                String resourcePath = rootURL.getPath();
+                resourcePath = rootURL.getPath();
                 String rootPath = new File(resourcePath).getParentFile().getParent();
                 computedRealPath = new File(rootPath, path).getAbsolutePath();
-            } else {
-                String resourcePath = context.getRealPath("/");
+            }
+            if (computedRealPath == null) {
+                resourcePath = context.getRealPath("/");
                 computedRealPath = new File(resourcePath, path).getAbsolutePath();
             }
-            return java.net.URLDecoder.decode(computedRealPath, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new XFormsConfigException("path could not be resolved: " + path);
+            if (computedRealPath == null) {
+                if (!(resourcePath.startsWith("/"))) {
+                    resourcePath = "/" + resourcePath;
+                }
+                URL pathURL = WebFactory.class.getResource(resourcePath);
+                if (pathURL != null) {
+                    computedRealPath = pathURL.getPath();
+                } else if (context.getResource(resourcePath) != null && !"jndi".equals(context.getResource(resourcePath).getProtocol())) {
+                    pathURL = context.getResource(resourcePath);
+                    computedRealPath = pathURL.getPath();
+                } else if (context.getRealPath(path) != null) {
+                    computedRealPath = context.getRealPath(path);
+                } else {
+                    resourcePath = path;
+                    String dir = WebFactory.class.getResource("/").getPath();
+                    if (dir == null) {
+                        return null;
+                    }
+                    if (resourcePath.startsWith("/")) {
+                        resourcePath = resourcePath.substring(1, resourcePath.length());
+                    }
+                    File file = new File(dir, resourcePath);
+                    computedRealPath = file.getAbsolutePath();
+                }
+            }
+
+            return
+                    java.net.URLDecoder.decode(computedRealPath, StandardCharsets.UTF_8.name());
+
+        }
+        catch (UnsupportedEncodingException e) {
+            throw new XFormsConfigException("Exception: UnsupportedEncodingException: path could not be resolved: " + path + " Error: " + e.getMessage());
+        } catch (MalformedURLException e) {
+            throw new XFormsConfigException("Exception: MalformedURLException: path could not be resolved: " + path + " Error: " + e.getMessage());
         }
     }
 }
